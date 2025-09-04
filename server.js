@@ -10,13 +10,37 @@ const expenseRoutes = require("./Routes/ExpenseRoutes");
 const dashboardRoutes = require("./Routes/DashboardRoutes");
 
 // Middleware
-app.use(cors({ origin: (origin, callback) => {
-    const allowedOrigins = [
+const parseAllowedOrigins = () => {
+    const fromEnv = (process.env.ALLOWED_ORIGINS || "")
+        .split(",")
+        .map(v => v.trim())
+        .filter(Boolean);
+    const defaults = [
         process.env.CLIENT_URL,
         "http://localhost:3000",
         "http://127.0.0.1:3000"
     ].filter(Boolean);
-    if (!origin || allowedOrigins.includes(origin)) {
+    return Array.from(new Set([...fromEnv, ...defaults]));
+};
+
+const isOriginAllowed = (origin, allowedOrigins) => {
+    for (const entry of allowedOrigins) {
+        if (entry.includes("*")) {
+            const pattern = "^" + entry.replace(/\./g, "\\.").replace(/\*/g, ".*") + "$";
+            if (new RegExp(pattern).test(origin)) return true;
+        } else if (entry === origin) {
+            return true;
+        }
+    }
+    return false;
+};
+
+app.use(cors({ origin: (origin, callback) => {
+    const allowedOrigins = parseAllowedOrigins();
+    if (!origin) {
+        return callback(null, true);
+    }
+    if (isOriginAllowed(origin, allowedOrigins)) {
         return callback(null, true);
     }
     return callback(new Error("Not allowed by CORS"));
